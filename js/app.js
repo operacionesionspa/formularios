@@ -245,6 +245,7 @@
           <div class="op prox"><span class="ico">${esc(x.icono || '📄')}</span>
             <span class="tx"><b>${esc(x.nombre)}</b><small>Próximamente</small></span></div>`).join('')}
       </div>
+      ${(() => { const t = ((CFG.proyectos || []).find((x) => x.codigo === p.codigo) || {}).tablero; return t ? `<div class="lista-op"><a class="op" href="${esc(t)}" style="text-decoration:none;color:inherit"><span class="ico">📊</span><span class="tx"><b>Tablero del proyecto</b><small>Programa, tareas por área y minutas</small></span><span class="fl">›</span></a></div>` : ''; })()}
       <div class="lista-op">
         <button class="op" data-ir="envios"><span class="ico">🗂️</span>
           <span class="tx"><b>Mis envíos</b><small>Documentos generados en este teléfono</small></span>
