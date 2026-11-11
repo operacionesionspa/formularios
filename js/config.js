@@ -22,7 +22,7 @@ window.OPS_CONFIG = {
   // lat / lon: ubicación de la obra para el clima automático (Open-Meteo).
   // Confirmar con las coordenadas del proyecto (Google Maps: clic derecho sobre la obra).
   proyectos: [
-    { codigo: 'CAL26', nombre: 'PMG Caliche', lat: -22.33, lon: -69.46 },
+    { codigo: 'CAL26', nombre: 'PMG Caliche', lat: -22.33, lon: -69.46, tablero: 'caliche/' },
     { codigo: 'AQA26', nombre: 'PFV Aquanqa' },
     { codigo: 'SCB25', nombre: 'PMGD SCB' }
   ],
