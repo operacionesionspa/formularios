@@ -20,10 +20,14 @@
  *     ID correlativo en la pestaña "Avance_Lineas".
  *   - El Excel lee las líneas nuevas con:
  *       <URL>/exec?accion=avance&proyecto=CAL26&clave=...&desde=<último ID>
+ *
+ *  Tablero de programa (desde la versión 1.2):
+ *   - El Excel publica la Gantt interna SIN COSTOS (acción "gantt", con clave).
+ *   - El tablero web la lee sin clave: <URL>/exec?accion=gantt&proyecto=CAL26
  * =====================================================================
  */
 
-var VERSION_SCRIPT = '1.1.0';
+var VERSION_SCRIPT = '1.2.0';
 var HOJA_AVANCE = 'Avance_Lineas';
 var MAX_LINEAS = 1500;
 var HOJA_PROYECTOS = 'Proyectos';
@@ -73,6 +77,7 @@ function probarCorreo() {
 function doGet(e) {
   var prm = (e && e.parameter) || {};
   if (prm.accion === 'avance') return salidaAvance_(prm);
+  if (prm.accion === 'gantt') return salidaGantt_(prm);
   return salida_({ ok: true, app: 'Operaciones ION', version: VERSION_SCRIPT, mensaje: 'El script está publicado correctamente.' });
 }
 
@@ -91,6 +96,7 @@ function doPost(e) {
       case 'enviar': return salida_(accionEnviar_(req));
       case 'catalogo': return salida_(accionCatalogo_(req));
       case 'catalogo_get': return salida_(accionCatalogoGet_(req));
+      case 'gantt': return salida_(accionGantt_(req));
       default: return salida_({ ok: false, codigo: 'accion', error: 'Acción desconocida.' });
     }
   } catch (err) {
@@ -323,6 +329,54 @@ function salidaAvance_(prm) {
   }
   return ContentService.createTextOutput(txt).setMimeType(ContentService.MimeType.TEXT);
 }
+
+/* ============================ tablero de programa (Gantt sin costos) ============================ */
+var COLUMNAS_GANTT = ['id', 'niv', 'nombre', 'cuenta', 'tipo', 'prov', 'area', 'disc', 'unid', 'cant', 'ejec', 'aplica',
+  'ini', 'fin', 'iniR', 'finR', 'pct', 'lbIni', 'lbFin', 'desv', 'alerta'];
+
+function archivoGantt_(codigo, crear) {
+  var carpeta = carpetaRaiz_();
+  var nombre = 'gantt_' + codigo + '.json';
+  var it = carpeta.getFilesByName(nombre);
+  if (it.hasNext()) return it.next();
+  return crear ? carpeta.createFile(nombre, '{}', 'application/json') : null;
+}
+
+function accionGantt_(req) {
+  var p = proyectoAutorizado_(req);
+  var d = req.data || {};
+  if (!Array.isArray(d.cols) || !Array.isArray(d.filas) || !d.filas.length) throw errorApp_('formato', 'La Gantt viene vacía.');
+  if (d.filas.length > 6000) throw errorApp_('formato', 'La Gantt es demasiado grande.');
+  // solo se guardan las columnas permitidas (nunca costos)
+  var idx = COLUMNAS_GANTT.map(function (c) { return d.cols.indexOf(c); });
+  var filas = d.filas.map(function (f) {
+    return idx.map(function (i) {
+      var v = i < 0 || !Array.isArray(f) ? null : f[i];
+      return typeof v === 'number' ? (isFinite(v) ? v : null) : (v === null || v === undefined ? null : String(v).slice(0, 200));
+    });
+  });
+  var num = function (v) { var n = Number(v); return v === null || v === '' || !isFinite(n) ? null : n; };
+  var av = d.avance || {};
+  var g = {
+    proyecto: p.codigo, nombre: p.nombre, generado: texto_(d.generado, 20), corte: texto_(d.corte, 10), recibido: new Date().toISOString(),
+    avance: { lntp: num(av.lntp), ntp: num(av.ntp), total: num(av.total) }, cols: COLUMNAS_GANTT, filas: filas
+  };
+  var lock = tomarLock_();
+  try {
+    archivoGantt_(p.codigo, true).setContent(JSON.stringify(g));
+  } finally {
+    lock.releaseLock();
+  }
+  return { ok: true, n: filas.length };
+}
+
+function salidaGantt_(prm) {
+  var codigo = texto_(prm.proyecto, 20).toUpperCase();
+  var f = archivoGantt_(codigo, false);
+  if (!f) return salida_({ ok: false, codigo: 'gantt', error: 'Todavía no hay Gantt publicada para ' + codigo + '.' });
+  return ContentService.createTextOutput('{"ok":true,"gantt":' + f.getBlob().getDataAsString('UTF-8') + '}').setMimeType(ContentService.MimeType.JSON);
+}
+
 
 /* ============================ proyectos y folios ============================ */
 function proyectoAutorizado_(req) {
